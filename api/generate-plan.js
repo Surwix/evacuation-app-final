@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import chromium from 'chrome-aws-lambda';
+import chromium from '@sparticuz/chrome-aws-lambda';
 import { OpenAI } from 'openai';
 
 // Инициализируем клиент OpenAI с вашим API ключом из переменных окружения
