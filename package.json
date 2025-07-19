@@ -2,7 +2,6 @@
   "type": "module",
   "dependencies": {
     "nodemailer": "6.9.14",
-    "@sparticuz/chrome-aws-lambda": "21.0.0",
-    "puppeteer-core": "21.0.0"
+    "openai": "4.28.0"
   }
 }
