@@ -1,28 +1,44 @@
 import nodemailer from 'nodemailer';
 import { OpenAI } from 'openai';
-import fetch from 'node-fetch'; // Используем fetch для отправки запросов
+import fetch from 'node-fetch';
 
 // Инициализируем клиент OpenAI
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Функция для получения рекомендаций от ИИ
+// --- УЛУЧШЕННЫЙ ПРОМПТ ДЛЯ CHATGPT ---
 async function getAiRecommendations(address) {
-    const prompt = `Act as an emergency preparedness expert for the U.S. address: "${address}". Create a concise, structured emergency plan in HTML format. Include sections for local risks (e.g., hurricanes, earthquakes), primary evacuation routes, and a safe meeting point type (e.g., "a public library").`;
+    console.log(`Requesting ADVANCED AI recommendations for: ${address}`);
+
+    // Вот наш новый, более детальный промпт:
+    const prompt = `
+        Act as a senior emergency preparedness analyst from FEMA, creating a critical evacuation guide.
+        The target U.S. address is: "${address}".
+
+        Your task is to generate a detailed, structured report in HTML format. Use <h2> for main section titles and <ul> with <li> for lists.
+
+        The report must include the following sections:
+        1.  **Primary Risks Assessment:** Based on the general region of the address (state and county), identify and list the top 3-4 most probable natural disaster risks (e.g., Hurricanes, Tornadoes, Wildfires, Earthquakes, Flooding, Blizzards). For each risk, provide a one-sentence explanation of why it's relevant to that area.
+        2.  **Immediate Evacuation Checklist:** Provide a bulleted list of critical actions to take in the first 15 minutes of an evacuation order.
+        3.  **"Go-Bag" Essentials:** Provide a bulleted list of essential items for a pre-packed emergency kit ("go-bag"), tailored to the risks you identified.
+        4.  **Evacuation Route Strategy:** Provide general advice on planning primary and secondary evacuation routes from the address. Do not give specific street names, but suggest principles (e.g., "head inland, away from the coast" or "avoid low-lying areas and bridges").
+        5.  **Safe Meeting Point:** Suggest three different *types* of safe meeting points for family members (e.g., "A specific public library in a neighboring town," "A specific major landmark," "A relative's home in another state").
+    `;
+
     try {
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
+            model: "gpt-4o", // Эта модель отлично справится с задачей
             messages: [{ role: "user", content: prompt }],
         });
         return completion.choices[0].message.content;
     } catch (error) {
         console.error("Error fetching from OpenAI:", error);
-        return "<h2>План по умолчанию</h2><p>Не удалось получить рекомендации от ИИ. Действуйте согласно базовым правилам безопасности.</p>";
+        return "<h2>Default Plan</h2><p>Failed to get recommendations from AI. Please follow basic safety protocols.</p>";
     }
 }
-
-// Функция, которая создает HTML для PDF
+// --- КОНЕЦ НОВОГО ПРОМПТА ---
+    
 function getPdfHtml(address, aiContent) {
     return `
         <!DOCTYPE html>
@@ -36,24 +52,20 @@ function getPdfHtml(address, aiContent) {
         </html>`;
 }
 
-// Основной обработчик
+// Основной обработчик (остается без изменений)
 export default async function handler(request, response) {
     const { address, email } = request.body;
     if (!address || !email) return response.status(400).json({ message: 'Address and email are required' });
 
     try {
-        // 1. Получаем рекомендации от ИИ
         const aiContent = await getAiRecommendations(address);
-
-        // 2. Генерируем HTML для PDF
         const html = getPdfHtml(address, aiContent);
 
-        // 3. ОБРАЩАЕМСЯ К СЕРВИСУ API2PDF ДЛЯ СОЗДАНИЯ PDF
         const pdfResponse = await fetch('https://v2018.api2pdf.com/chrome/html', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': process.env.API2PDF_KEY, // Используем новый ключ
+                'Authorization': process.env.API2PDF_KEY,
             },
             body: JSON.stringify({ html: html, inlinePdf: true }),
         });
@@ -64,12 +76,10 @@ export default async function handler(request, response) {
         }
 
         const { pdf: pdfUrl } = await pdfResponse.json();
-
-        // Скачиваем PDF по полученной ссылке
+        
         const pdfDownloadResponse = await fetch(pdfUrl);
         const pdfBuffer = await pdfDownloadResponse.arrayBuffer();
 
-        // 4. Отправляем email с готовым PDF
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: { user: process.env.EMAIL_SERVER_USER, pass: process.env.EMAIL_SERVER_PASSWORD },
@@ -77,16 +87,16 @@ export default async function handler(request, response) {
         await transporter.sendMail({
             from: `"Evacuation Plan Bot" <${process.env.EMAIL_SERVER_USER}>`,
             to: email,
-            subject: `Ваш ИИ-план эвакуации PDF для ${address}`,
+            subject: `Ваш детальный ИИ-план эвакуации PDF для ${address}`,
             text: "Ваш PDF-план эвакуации, сгенерированный ИИ, прикреплен к этому письму.",
             attachments: [{
                 filename: 'AI-Evacuation-Plan.pdf',
-                content: Buffer.from(pdfBuffer), // Конвертируем в Buffer
+                content: Buffer.from(pdfBuffer),
                 contentType: 'application/pdf',
             }],
         });
 
-        response.status(200).json({ message: `PDF-план от ИИ успешно сгенерирован и отправлен на почту ${email}!` });
+        response.status(200).json({ message: `Детальный PDF-план от ИИ успешно сгенерирован и отправлен на почту ${email}!` });
 
     } catch (error) {
         console.error(error);
