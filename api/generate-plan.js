@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer';
 import { OpenAI } from 'openai';
-import fetch from 'node-fetch';
 
 // Вспомогательные функции (без изменений)
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
