@@ -6,45 +6,9 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-/**
- * Формирует промт с приоритетом для твоих реальных riskScores.
- */
-function buildPrompt(address, riskScores) {
-    return `
-You are a FEMA-level emergency preparedness expert.
-
-1. Your goal is to generate a JSON object ONLY (no pre/post text). The JSON must have:
-    - "riskScores": exact same values as provided.
-    - "reportHtml": a fully structured HTML evacuation report with rich formatting, icons, color highlights, and user-friendly blocks.
-
-2. The target address is: "${address}"
-3. Use these CLIMATE RISKS as the basis for your analysis (do not guess, use exactly as given):
-    - Flood: ${riskScores.flood}/10
-    - Fire: ${riskScores.fire}/10
-    - Wind: ${riskScores.wind}/10
-    - Air: ${riskScores.air}/10
-    - Heat: ${riskScores.heat}/10
-
-In "reportHtml", include sections:
-- <h2>Primary Risk Overview</h2> (analyze the given risk scores, say which are most relevant, add icons, color "Major"/"Moderate" risks in red/orange, others neutral/green)
-- <h2>Evacuation Actions Checklist</h2> (bulleted, key steps, short)
-- <h2>Go-Bag Essentials</h2> (bulleted list, 6-8 items)
-- <h2>Evacuation Route Strategy</h2> (general advice)
-- <h2>Emergency Contacts</h2> (universal: 911, local fire, etc)
-
-Your HTML can include inline style attributes and emoji icons for risks (e.g., 🔥 for fire), color code risks, but keep design clean and print-friendly. All content should fit on 1-2 A4 pages and be clear for any family.
-
-Strictly output a single valid JSON object as described above.
-`;
-}
-
-/**
- * Генерирует эвакуационный план через OpenAI (с учётом твоих riskScores!).
- */
-async function getAiRecommendations(address, riskScores) {
-    console.log(`Requesting structured AI recommendations for: ${address}`);
-    const prompt = buildPrompt(address, riskScores);
-
+// ФУНКЦИЯ ДЛЯ ЗАПРОСА К ИИ (без изменений)
+async function getAiRecommendations(address) {
+    const prompt = `Act as a FEMA emergency analyst for the U.S. address: "${address}". Return a JSON object with two keys: "riskScores" (object with integer scores 1-10 for flood, fire, wind, air, heat) and "reportHtml" (a detailed evacuation plan in HTML with <h2> and <ul> sections for Primary Risks, Evacuation Checklist, Go-Bag, and Route Strategy).`;
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-4o",
@@ -58,142 +22,113 @@ async function getAiRecommendations(address, riskScores) {
     }
 }
 
-/**
- * Генерирует ссылку на график через QuickChart (можешь заменить на свой или Chart.js сервер).
- */
+// НОВАЯ ФУНКЦИЯ ДЛЯ ПОИСКА БОЛЬНИЦ ЧЕРЕЗ GOOGLE PLACES API
+async function getNearbyHospitals(address) {
+    console.log(`Searching for hospitals near: ${address}`);
+    try {
+        const searchParams = new URLSearchParams({
+            query: `hospital near ${address}`,
+            key: process.env.Maps_API_KEY, // Убедитесь, что ваш ключ Google назван так в Vercel
+        });
+        const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?${searchParams}`);
+        if (!response.ok) throw new Error(`Google Places API error: ${response.statusText}`);
+        
+        const data = await response.json();
+        return data.results.slice(0, 3); // Возвращаем до 3 найденных больниц
+    } catch (error) {
+        console.error("Error fetching from Google Places:", error);
+        return []; // Возвращаем пустой массив в случае ошибки
+    }
+}
+
+// ФУНКЦИЯ ДЛЯ ГРАФИКА (без изменений)
 function getChartUrl(scores) {
-    // Цвета для каждого риска (можно сделать динамическими)
-    const colors = [
-        scores.flood >= 5 ? 'rgba(33, 150, 243, 0.9)' : 'rgba(129, 199, 132, 0.8)', // blue/green
-        scores.fire >= 5 ? 'rgba(229, 57, 53, 0.9)' : 'rgba(255, 205, 210, 0.8)',    // red/pink
-        scores.wind >= 5 ? 'rgba(38, 166, 154, 0.9)' : 'rgba(178, 235, 242, 0.8)',   // teal/light blue
-        scores.air  >= 5 ? 'rgba(120, 144, 156, 0.9)' : 'rgba(207, 216, 220, 0.8)',  // grey/light grey
-        scores.heat >= 5 ? 'rgba(255, 167, 38, 0.9)' : 'rgba(255, 224, 178, 0.8)'    // orange/light orange
-    ];
-    const chartConfig = {
-        type: 'horizontalBar',
-        data: {
-            labels: ['Flood', 'Fire', 'Wind', 'Air', 'Heat'],
-            datasets: [{
-                label: 'Risk Score',
-                data: [scores.flood, scores.fire, scores.wind, scores.air, scores.heat],
-                backgroundColor: colors,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            scales: {
-                xAxes: [{ ticks: { beginAtZero: true, max: 10 }, gridLines: { color: "#eee" } }],
-                yAxes: [{ gridLines: { color: "#eee" } }]
-            },
-            legend: { display: false },
-            title: { display: false }
-        }
-    };
-    const encodedConfig = encodeURIComponent(JSON.stringify(chartConfig));
-    return `https://quickchart.io/chart?c=${encodedConfig}&width=500&height=250&backgroundColor=white`;
+    const chartConfig = { type: 'bar', data: { labels: ['Flood', 'Fire', 'Wind', 'Air', 'Heat'], datasets: [{ label: 'Risk Score', data: [scores.flood, scores.fire, scores.wind, scores.air, scores.heat], backgroundColor: 'rgba(211, 47, 47, 0.7)' }] }, options: { legend: { display: false }, scales: { yAxes: [{ ticks: { beginAtZero: true, max: 10 } }] } } };
+    return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&width=500&height=300&backgroundColor=white`;
 }
 
-/**
- * Улучшенный HTML шаблон для PDF.
- */
-function getPdfHtml(address, riskScores, chartUrl, reportHtml) {
-    // Можно добавить эмодзи и цвет в “riskScores” прямо тут для визуала:
-    function riskBlock(name, icon, score, label) {
-        let color;
-        if (score >= 7) color = '#c62828'; // major: red
-        else if (score >= 4) color = '#fbc02d'; // moderate: orange
-        else color = '#388e3c'; // minor: green
+// НОВЫЙ, КРАСИВЫЙ HTML-ШАБЛОН ДЛЯ PDF
+function getPdfHtml(address, aiData, hospitals) {
+    // Создаем HTML-список больниц
+    const hospitalsHtml = hospitals.length > 0
+        ? `<ul>${hospitals.map(h => `<li><strong>${h.name}</strong><br>${h.formatted_address}</li>`).join('')}</ul>`
+        : "<p>Не удалось загрузить список ближайших медицинских учреждений.</p>";
 
-        return `
-        <div style="flex:1; background:#f5f5f5; margin:5px; border-radius:10px; padding:8px 0; text-align:center;">
-          <div style="font-size:22px;">${icon}</div>
-          <div style="font-weight:bold;">${name}</div>
-          <div style="color:${color}; font-weight:bold;">${label} (${score}/10)</div>
-        </div>`;
-    }
     return `
-    <!DOCTYPE html>
-    <html lang="ru">
-    <head>
-      <meta charset="UTF-8">
-      <title>Персональный план эвакуации</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color: #222; background: #fff; font-size: 15px; }
-        .container { max-width: 720px; margin: 0 auto; padding: 28px; }
-        h1 { font-size: 28px; color: #c62828; text-align: center; margin-bottom: 0; }
-        h2 { font-size: 21px; color: #37474f; margin-top: 32px; }
-        .chart-container { text-align: center; margin: 18px 0; }
-        .risk-row { display: flex; flex-direction: row; justify-content: space-between; margin-bottom: 20px; }
-        .footer { margin-top: 40px; font-size: 12px; color: #757575; text-align: center; border-top: 1px solid #eceff1; padding-top: 15px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h1>Персональный план эвакуации</h1>
-        <p><strong>Адрес:</strong> ${address}</p>
+        <!DOCTYPE html>
+        <html lang="ru">
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; color: #333; }
+                .container { padding: 30px; }
+                .header { text-align: center; border-bottom: 2px solid #d9534f; padding-bottom: 15px; margin-bottom: 20px; }
+                .header h1 { font-size: 26pt; color: #d9534f; margin: 0; }
+                .header p { font-size: 12pt; color: #777; margin: 5px 0 0 0; }
+                .section h2 { font-size: 16pt; color: #333; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-top: 25px; margin-bottom: 15px; }
+                .chart-container { text-align: center; margin: 25px 0; }
+                ul { padding-left: 20px; }
+                li { margin-bottom: 10px; }
+                .footer { margin-top: 40px; font-size: 9pt; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>План экстренной эвакуации</h1>
+                    <p>${address}</p>
+                </div>
 
-        <h2>Обзор климатических рисков</h2>
-        <div class="risk-row">
-            ${riskBlock('Flood', '💧', riskScores.flood, riskLabel(riskScores.flood))}
-            ${riskBlock('Fire', '🔥', riskScores.fire, riskLabel(riskScores.fire))}
-            ${riskBlock('Wind', '💨', riskScores.wind, riskLabel(riskScores.wind))}
-            ${riskBlock('Air', '🌫️', riskScores.air, riskLabel(riskScores.air))}
-            ${riskBlock('Heat', '🌡️', riskScores.heat, riskLabel(riskScores.heat))}
-        </div>
-        <div class="chart-container">
-            <img src="${chartUrl}" alt="Climate Risk Chart" style="max-width:100%;border-radius:12px;">
-        </div>
-        ${reportHtml}
+                <div class="section">
+                    <h2>Обзор климатических рисков</h2>
+                    <div class="chart-container"><img src="${getChartUrl(aiData.riskScores)}" alt="Climate Risk Chart"></div>
+                </div>
 
-        <div class="footer">
-            <p><em>Отчет сгенерирован с помощью ИИ и климатических данных. Следуйте указаниям экстренных служб в вашем районе.</em></p>
-        </div>
-      </div>
-    </body>
-    </html>
+                <div class="section">
+                    ${aiData.reportHtml}
+                </div>
+
+                <div class="section">
+                    <h2>Ближайшие медицинские учреждения</h2>
+                    ${hospitalsHtml}
+                </div>
+
+                <div class="footer">
+                    <p>Отчет сгенерирован с помощью ИИ и данных Google Maps. Информация носит рекомендательный характер. Всегда следуйте указаниям экстренных служб.</p>
+                </div>
+            </div>
+        </body>
+        </html>
     `;
-
-    // Utility for risk label
-    function riskLabel(score) {
-        if (score >= 7) return 'Major';
-        if (score >= 4) return 'Moderate';
-        return 'Minor';
-    }
 }
 
+// ФИНАЛЬНАЯ ВЕРСИЯ ОСНОВНОГО ОБРАБОТЧИКА
 export default async function handler(request, response) {
-    const { address, email, riskScores } = request.body;
-
-    // Валидация
-    if (!address || !email || !riskScores)
-        return response.status(400).json({ message: 'Address, email and riskScores are required' });
+    const { address, email } = request.body;
+    if (!address || !email) return response.status(400).json({ message: 'Address and email are required' });
 
     try {
-        // Получаем отчет от AI
-        const aiData = await getAiRecommendations(address, riskScores);
+        // Запускаем запросы к ИИ и Google параллельно, чтобы сэкономить время
+        const [aiData, hospitals] = await Promise.all([
+            getAiRecommendations(address),
+            getNearbyHospitals(address)
+        ]);
+
         if (!aiData) throw new Error("Failed to get data from AI");
 
-        // Генерируем график
-        const chartUrl = getChartUrl(riskScores);
+        const html = getPdfHtml(address, aiData, hospitals);
 
-        // Генерируем финальный HTML для PDF
-        const html = getPdfHtml(address, riskScores, chartUrl, aiData.reportHtml);
-
-        // Генерируем PDF через Api2Pdf (или другой сервис)
         const pdfResponse = await fetch('https://v2018.api2pdf.com/chrome/html', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': process.env.API2PDF_KEY },
-            body: JSON.stringify({ html: html, inlinePdf: true, options: { landscape: false } }),
+            body: JSON.stringify({ html: html, inlinePdf: true }),
         });
-
         if (!pdfResponse.ok) throw new Error(`Api2Pdf error: ${await pdfResponse.text()}`);
-
         const { pdf: pdfUrl } = await pdfResponse.json();
+        
         const pdfDownloadResponse = await fetch(pdfUrl);
         const pdfBuffer = await pdfDownloadResponse.arrayBuffer();
 
-        // Отправляем PDF на почту
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: { user: process.env.EMAIL_SERVER_USER, pass: process.env.EMAIL_SERVER_PASSWORD },
@@ -201,19 +136,15 @@ export default async function handler(request, response) {
         await transporter.sendMail({
             from: `"Evacuation Plan Bot" <${process.env.EMAIL_SERVER_USER}>`,
             to: email,
-            subject: `Ваш детальный ИИ-план эвакуации (с графиками) для ${address}`,
-            text: "Ваш PDF-план эвакуации прикреплен к этому письму.",
-            attachments: [{
-                filename: 'AI-Evacuation-Plan-Pro.pdf',
-                content: Buffer.from(pdfBuffer),
-                contentType: 'application/pdf',
-            }],
+            subject: `Ваш профессиональный отчет по эвакуации для ${address}`,
+            text: "Ваш PDF-отчет прикреплен к этому письму.",
+            attachments: [{ filename: 'Pro-Evacuation-Report.pdf', content: Buffer.from(pdfBuffer), contentType: 'application/pdf' }],
         });
 
         response.status(200).json({ message: `Профессиональный PDF-отчет успешно сгенерирован и отправлен на почту ${email}!` });
 
     } catch (error) {
         console.error(error);
-        response.status(500).json({ message: 'Что-то пошло не так при создании отчета.' });
+        response.status(500).json({ message: 'Что-то пошло не так при создании профессионального отчета.' });
     }
 }
