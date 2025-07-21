@@ -4,11 +4,39 @@ import fetch from 'node-fetch';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Функция, которая просит у ИИ сгенерировать JSON с данными для отчета
 async function getAiReportData(address) {
-    // ... (вспомогательная функция остается без изменений)
-    const prompt = `Act as a data analyst...`; // Сокращено для краткости
+    console.log(`Requesting report data from AI for: ${address}`);
+
+    // Полный и правильный промпт, который включает слово JSON
+    const prompt = `
+        Act as a data analyst. For the U.S. address "${address}", generate a mock business intelligence report for an evacuation plan company.
+        Your response must be ONLY a valid JSON object. Do not include any text before or after the JSON.
+        The JSON must match this exact structure:
+        {
+          "followers": { "count": INTEGER, "difference": INTEGER, "progress": INTEGER_BETWEEN_0_AND_100 },
+          "customers": { "count": INTEGER, "difference": INTEGER, "progress": INTEGER_BETWEEN_0_AND_100 },
+          "sales": { "count": INTEGER, "difference": INTEGER, "progress": INTEGER_BETWEEN_0_AND_100 },
+          "semester_revenues": [
+            { "month": "Jan", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
+            { "month": "Feb", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
+            { "month": "Mar", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
+            { "month": "Apr", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
+            { "month": "May", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
+            { "month": "Jun", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER }
+          ],
+          "expenses": { "support": INTEGER, "sales": INTEGER, "drives": INTEGER, "marketing": INTEGER, "allocated": INTEGER, "actual": INTEGER },
+          "evacuation_plan_summary": "Provide a 2-3 sentence summary of the key evacuation advice for the area based on the address."
+        }
+        Generate realistic but random integer values for all fields.
+    `;
+
     try {
-        const completion = await openai.chat.completions.create({ model: "gpt-4o", response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }] });
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            response_format: { type: "json_object" },
+            messages: [{ role: "user", content: prompt }],
+        });
         return JSON.parse(completion.choices[0].message.content);
     } catch (error) {
         console.error("Error from OpenAI:", error);
@@ -16,23 +44,28 @@ async function getAiReportData(address) {
     }
 }
 
-// Основной обработчик с логами
+// Основной обработчик
 export default async function handler(request, response) {
     const { address, email } = request.body;
     if (!address || !email) return response.status(400).json({ message: 'Address and email are required' });
 
     try {
-        console.log("Step 1: Attempting to call OpenAI API...");
         const aiData = await getAiReportData(address);
-        console.log("Step 2: OpenAI API call successful.");
 
-        console.log("Step 3: Attempting to call PDFMonkey API...");
         const pdfResponse = await fetch(`https://api.pdfmonkey.com/v1/documents`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.PDFMONKEY_API_KEY}` },
-            body: JSON.stringify({ document: { template_id: process.env.PDFMONKEY_TEMPLATE_ID, payload: aiData, status: 'draft' } }),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.PDFMONKEY_API_KEY}`,
+            },
+            body: JSON.stringify({
+                document: {
+                    template_id: process.env.PDFMONKEY_TEMPLATE_ID,
+                    payload: aiData,
+                    status: 'draft',
+                }
+            }),
         });
-        console.log("Step 4: PDFMonkey API call successful.");
 
         if (!pdfResponse.ok) {
             throw new Error(`PDFMonkey API error: ${await pdfResponse.text()}`);
@@ -41,26 +74,26 @@ export default async function handler(request, response) {
         const pdfData = await pdfResponse.json();
         const downloadUrl = pdfData.document.download_url;
 
-        console.log("Step 5: Attempting to download generated PDF...");
         const pdfDownloadResponse = await fetch(downloadUrl);
         const pdfBuffer = await pdfDownloadResponse.arrayBuffer();
-        console.log("Step 6: PDF download successful.");
 
-        console.log("Step 7: Attempting to send email...");
         const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.EMAIL_SERVER_USER, pass: process.env.EMAIL_SERVER_PASSWORD } });
         await transporter.sendMail({
             from: `"Evacuation Plan Bot" <${process.env.EMAIL_SERVER_USER}>`,
             to: email,
             subject: `Ваш BI отчет по эвакуации для ${address}`,
             text: "Ваш PDF-отчет прикреплен к этому письму.",
-            attachments: [{ filename: 'BI-Evacuation-Report.pdf', content: Buffer.from(pdfBuffer), contentType: 'application/pdf' }],
+            attachments: [{
+                filename: 'BI-Evacuation-Report.pdf',
+                content: Buffer.from(pdfBuffer),
+                contentType: 'application/pdf',
+            }],
         });
-        console.log("Step 8: Email sent successfully.");
 
         response.status(200).json({ message: `BI-отчет успешно сгенерирован и отправлен!` });
 
     } catch (error) {
-        console.error(error); // Эта строка выведет детальную ошибку
+        console.error(error);
         response.status(500).json({ message: 'Что-то пошло не так при создании отчета.' });
     }
 }
