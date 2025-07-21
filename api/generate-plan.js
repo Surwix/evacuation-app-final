@@ -53,7 +53,7 @@ export default async function handler(request, response) {
         const aiData = await getAiReportData(address);
 
         // 2. Отправляем данные в PDFMonkey для генерации PDF
-        const pdfResponse = await fetch(`https://api.pdfmonkey.com/v1/documents`, {
+        const pdfResponse = await fetch(`https://api.pdfmonkey.com/v1/documents`, { // <--- Убедитесь, что эта строка скопирована точно
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -62,7 +62,7 @@ export default async function handler(request, response) {
             body: JSON.stringify({
                 document: {
                     template_id: process.env.PDFMONKEY_TEMPLATE_ID,
-                    payload: aiData, // Отправляем все сгенерированные данные
+                    payload: aiData,
                     status: 'draft',
                 }
             }),
