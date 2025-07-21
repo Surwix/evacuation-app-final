@@ -52,7 +52,8 @@ export default async function handler(request, response) {
     try {
         const aiData = await getAiReportData(address);
 
-        const pdfResponse = await fetch(`https://api.pdfmonkey.com/v1/documents`, {
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+        const pdfResponse = await fetch(`https://api.pdfmonkey.io/v1/documents`, { // .io вместо .com
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -77,7 +78,7 @@ export default async function handler(request, response) {
         const pdfDownloadResponse = await fetch(downloadUrl);
         const pdfBuffer = await pdfDownloadResponse.arrayBuffer();
 
-        const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.EMAIL_SERVER_USER, pass: process.env.EMAIL_SERVER_PASSWORD } });
+        const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.EMAIL_SERVER_USER, pass: process.env.PDFMONKEY_API_KEY } });
         await transporter.sendMail({
             from: `"Evacuation Plan Bot" <${process.env.EMAIL_SERVER_USER}>`,
             to: email,
