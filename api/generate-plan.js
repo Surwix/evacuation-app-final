@@ -2,33 +2,38 @@ import nodemailer from 'nodemailer';
 import { OpenAI } from 'openai';
 import fetch from 'node-fetch';
 
-// Инициализируем клиент OpenAI
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-// --- УЛУЧШЕННЫЙ ПРОМПТ ДЛЯ CHATGPT ---
+// --- ФИНАЛЬНЫЙ ПРОМПТ С ЗАПРОСОМ НА КЛИМАТИЧЕСКИЕ РИСКИ ---
 async function getAiRecommendations(address) {
-    console.log(`Requesting ADVANCED AI recommendations for: ${address}`);
+    console.log(`Requesting AI recommendations with climate risks for: ${address}`);
 
-    // Вот наш новый, более детальный промпт:
     const prompt = `
         Act as a senior emergency preparedness analyst from FEMA, creating a critical evacuation guide.
         The target U.S. address is: "${address}".
 
-        Your task is to generate a detailed, structured report in HTML format. Use <h2> for main section titles and <ul> with <li> for lists.
+        Your task is to generate a detailed, structured report in HTML format.
 
         The report must include the following sections:
-        1.  **Primary Risks Assessment:** Based on the general region of the address (state and county), identify and list the top 3-4 most probable natural disaster risks (e.g., Hurricanes, Tornadoes, Wildfires, Earthquakes, Flooding, Blizzards). For each risk, provide a one-sentence explanation of why it's relevant to that area.
-        2.  **Immediate Evacuation Checklist:** Provide a bulleted list of critical actions to take in the first 15 minutes of an evacuation order.
-        3.  **"Go-Bag" Essentials:** Provide a bulleted list of essential items for a pre-packed emergency kit ("go-bag"), tailored to the risks you identified.
-        4.  **Evacuation Route Strategy:** Provide general advice on planning primary and secondary evacuation routes from the address. Do not give specific street names, but suggest principles (e.g., "head inland, away from the coast" or "avoid low-lying areas and bridges").
-        5.  **Safe Meeting Point:** Suggest three different *types* of safe meeting points for family members (e.g., "A specific public library in a neighboring town," "A specific major landmark," "A relative's home in another state").
+        
+        1.  **Climate Risk Factors:** Create a section that mimics the Zillow/First Street climate risk scores. Provide a simple HTML structure (e.g., a flex container) with 5 boxes for Flood, Fire, Wind, Air Quality, and Heat risks. For each risk, provide a qualitative assessment (e.g., Minimal, Minor, Moderate, Major, Severe) and an estimated score on a 1-10 scale based on the general location. This is an estimation, not real-time data.
+
+        2.  **Primary Risks Assessment:** Based on the general region, identify and list the top 3-4 most probable natural disaster risks (e.g., Hurricanes, Tornadoes, Wildfires, Earthquakes). For each risk, provide a one-sentence explanation.
+
+        3.  **Immediate Evacuation Checklist:** Provide a bulleted list of critical actions to take in the first 15 minutes of an evacuation order.
+
+        4.  **"Go-Bag" Essentials:** Provide a bulleted list of essential items for a pre-packed emergency kit.
+
+        5.  **Evacuation Route Strategy:** Provide general advice on planning primary and secondary evacuation routes.
+        
+        Use <h2> for main section titles and <ul> with <li> for lists.
     `;
 
     try {
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o", // Эта модель отлично справится с задачей
+            model: "gpt-4o",
             messages: [{ role: "user", content: prompt }],
         });
         return completion.choices[0].message.content;
@@ -37,19 +42,38 @@ async function getAiRecommendations(address) {
         return "<h2>Default Plan</h2><p>Failed to get recommendations from AI. Please follow basic safety protocols.</p>";
     }
 }
-// --- КОНЕЦ НОВОГО ПРОМПТА ---
     
 function getPdfHtml(address, aiContent) {
     return `
         <!DOCTYPE html>
         <html lang="ru">
-        <head><meta charset="UTF-8"><style>body{font-family:sans-serif;font-size:14px;color:#333;line-height:1.6;}h1{font-size:24px;color:#b71c1c;}h2{font-size:18px;border-bottom:1px solid #eee;}</style></head>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; color: #333; line-height: 1.6; }
+                .container { padding: 20px; }
+                h1 { font-size: 24px; color: #b71c1c; border-bottom: 2px solid #f44336; padding-bottom: 10px; }
+                h2 { font-size: 18px; color: #333; margin-top: 25px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                .risk-container { display: flex; justify-content: space-between; gap: 10px; margin: 20px 0; }
+                .risk-box { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 10px; text-align: center; }
+                .risk-box h3 { font-size: 14px; margin: 0 0 5px 0; color: #555; }
+                .risk-box p { font-size: 18px; font-weight: bold; margin: 0; }
+                .footer { margin-top: 30px; font-size: 12px; color: #757575; border-top: 1px solid #eee; padding-top: 10px; }
+            </style>
+        </head>
         <body>
-            <h1>Персональный план эвакуации</h1>
-            <p><strong>Адрес:</strong> ${address}</p><hr>${aiContent}
-            <p><em>Отчет сгенерирован с помощью ИИ. Всегда следуйте указаниям экстренных служб.</em></p>
+            <div class="container">
+                <h1>Персональный план эвакуации</h1>
+                <p><strong>Адрес:</strong> ${address}</p>
+                <hr>
+                ${aiContent.replace(/\n/g, '<br>')}
+                <div class="footer">
+                    <p><em>Этот отчет сгенерирован с помощью ИИ. Информация носит рекомендательный характер. Всегда отдавайте приоритет официальным указаниям экстренных служб.</em></p>
+                </div>
+            </div>
         </body>
-        </html>`;
+        </html>
+    `;
 }
 
 // Основной обработчик (остается без изменений)
@@ -63,10 +87,7 @@ export default async function handler(request, response) {
 
         const pdfResponse = await fetch('https://v2018.api2pdf.com/chrome/html', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': process.env.API2PDF_KEY,
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': process.env.API2PDF_KEY },
             body: JSON.stringify({ html: html, inlinePdf: true }),
         });
 
@@ -76,7 +97,6 @@ export default async function handler(request, response) {
         }
 
         const { pdf: pdfUrl } = await pdfResponse.json();
-        
         const pdfDownloadResponse = await fetch(pdfUrl);
         const pdfBuffer = await pdfDownloadResponse.arrayBuffer();
 
@@ -89,11 +109,7 @@ export default async function handler(request, response) {
             to: email,
             subject: `Ваш детальный ИИ-план эвакуации PDF для ${address}`,
             text: "Ваш PDF-план эвакуации, сгенерированный ИИ, прикреплен к этому письму.",
-            attachments: [{
-                filename: 'AI-Evacuation-Plan.pdf',
-                content: Buffer.from(pdfBuffer),
-                contentType: 'application/pdf',
-            }],
+            attachments: [{ filename: 'AI-Evacuation-Plan.pdf', content: Buffer.from(pdfBuffer), contentType: 'application/pdf' }],
         });
 
         response.status(200).json({ message: `Детальный PDF-план от ИИ успешно сгенерирован и отправлен на почту ${email}!` });
