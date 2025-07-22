@@ -91,4 +91,74 @@ button[type="submit"] {
   color: var(--white);
   background-color: var(--primary-blue);
   border: none;
-  border-
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button[type="submit"]:hover {
+  background-color: var(--dark-blue);
+}
+
+.terms {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 16px;
+}
+.terms a {
+  color: var(--primary-blue);
+  text-decoration: none;
+}
+.terms a:hover {
+  text-decoration: underline;
+}
+
+.features {
+  background-color: var(--light-gray);
+  padding: 60px 40px;
+  text-align: center;
+}
+
+.features h2 {
+  font-size: 32px;
+  margin-bottom: 40px;
+  color: var(--dark-blue);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 30px;
+}
+
+.feature-item {
+  background: var(--white);
+  padding: 30px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.feature-icon {
+  font-size: 40px;
+  margin-bottom: 16px;
+}
+
+.feature-item h3 {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.feature-item p {
+  color: var(--text-light);
+  line-height: 1.6;
+}
+
+.footer {
+  text-align: center;
+  padding: 40px;
+  font-size: 14px;
+  color: var(--text-light);
+}
+.footer a {
+  color: var(--text-light);
+}
