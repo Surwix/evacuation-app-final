@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Emergency Evacuation Plan</title>
+    <title>Your Personal Evacuation Plan</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://maps.googleapis.com/maps/api/js?key=ТВОЙ_API_КЛЮЧ&libraries=places&callback=initAutocomplete" async defer></script>
 </head>
 <body>
-    <main class="container">
+    <div class="container">
         <h1>Your Personal Evacuation Plan</h1>
         <p>Enter your U.S. address and email to instantly receive a customized report.</p>
+        
         <form id="plan-form">
             <div class="form-group">
                 <label for="address-input">Your Address</label>
@@ -20,9 +22,11 @@
                 <input type="email" id="email-input" placeholder="Enter your email to receive the report" required>
             </div>
             <button type="submit">Get My Plan</button>
+            
+            <div id="notification" class="notification"></div>
         </form>
-    </main>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8EpOSadTcWb0Agqno2_kSW-_UijsUqAY&libraries=places&callback=initAutocomplete" async defer></script>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
