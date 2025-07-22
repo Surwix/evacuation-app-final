@@ -1,7 +1,11 @@
 {
+  "name": "surwix-service",
+  "version": "1.0.0",
+  "private": true,
   "type": "module",
   "dependencies": {
-    "nodemailer": "6.9.14",
-    "openai": "4.28.0"
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.7",
+    "openai": "^4.20.1"
   }
 }
