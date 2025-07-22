@@ -1,4 +1,4 @@
-// Функция автозаполнения адреса (остается без изменений)
+// Функция автозаполнения адреса Google
 function initAutocomplete() {
     const addressInput = document.getElementById('address-input');
     new google.maps.places.Autocomplete(addressInput, {
@@ -7,40 +7,45 @@ function initAutocomplete() {
     });
 }
 
-// Находим элементы на странице
+// Находим все нужные элементы на странице
 const planForm = document.getElementById('plan-form');
 const button = planForm.querySelector('button');
 const notification = document.getElementById('notification');
+const termsCheckbox = document.getElementById('terms-checkbox'); // Находим новый чекбокс
 
 // Функция для показа уведомлений
 function showNotification(message, type) {
     notification.textContent = message;
-    // Применяем классы для цвета (success = зеленый, error = красный)
     notification.className = 'notification ' + type; 
     notification.style.display = 'block';
 
-    // Прячем уведомление через 5 секунд
     setTimeout(() => {
         notification.style.display = 'none';
     }, 5000);
 }
 
-// Слушатель событий для формы
+// Слушатель событий для отправки формы
 planForm.addEventListener('submit', async function(event) {
-    event.preventDefault(); // Предотвращаем перезагрузку страницы
+    event.preventDefault(); // Предотвращаем стандартную перезагрузку
 
     const address = document.getElementById('address-input').value;
     const email = document.getElementById('email-input').value;
 
+    // ПРОВЕРКА ЧЕКБОКСА
+    if (!termsCheckbox.checked) {
+        showNotification('Пожалуйста, согласитесь с условиями использования.', 'error');
+        return; // Останавливаем выполнение, если галочка не стоит
+    }
+
     if (!address || !email) {
-        showNotification('Please fill out all fields.', 'error');
+        showNotification('Пожалуйста, заполните все поля.', 'error');
         return;
     }
 
-    // Меняем состояние кнопки
-    button.textContent = 'Generating...';
+    // Блокируем кнопку на время запроса
+    button.textContent = 'Генерация...';
     button.disabled = true;
-    notification.style.display = 'none'; // Прячем старое уведомление
+    notification.style.display = 'none';
 
     try {
         const response = await fetch('/api/generate-plan', {
@@ -52,20 +57,18 @@ planForm.addEventListener('submit', async function(event) {
         const result = await response.json();
 
         if (!response.ok) {
-            // Если сервер вернул ошибку, показываем ее
-            throw new Error(result.message || 'Server error');
+            throw new Error(result.message || 'Ошибка сервера');
         }
 
         showNotification(result.message, 'success');
-        planForm.reset(); // Очищаем форму после успеха
+        planForm.reset(); // Очищаем форму
 
     } catch (error) {
-        // Показываем ошибку в случае сбоя
-        showNotification('Sorry, something went wrong. Please try again.', 'error');
-        console.error('Fetch error:', error);
+        showNotification('К сожалению, что-то пошло не так. Попробуйте снова.', 'error');
+        console.error('Ошибка при отправке:', error);
     } finally {
-        // Возвращаем кнопку в исходное состояние в любом случае
-        button.textContent = 'Get My Plan';
+        // Возвращаем кнопку в исходное состояние
+        button.textContent = 'Получить мой план';
         button.disabled = false;
     }
 });
