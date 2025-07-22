@@ -9,36 +9,77 @@ function initAutocomplete() {
   }
 }
 
-// Handle form submission
+// Find elements on the page
 const planForm = document.getElementById('plan-form');
+const button = planForm.querySelector('button');
+const notification = document.getElementById('notification');
 
-planForm.addEventListener('submit', function(event) {
-  event.preventDefault(); // Prevents the form from actually submitting
-  
+// Function to show notifications on the page
+function showNotification(message, type) {
+    notification.textContent = message;
+    notification.className = 'notification ' + type; 
+    notification.style.display = 'block';
+
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 6000);
+}
+
+// Handle form submission
+planForm.addEventListener('submit', async function(event) {
+  event.preventDefault(); 
+
   const address = document.getElementById('address-input').value;
   const email = document.getElementById('email-input').value;
   const terms = document.getElementById('terms-checkbox').checked;
 
   if (!address || !email) {
-    alert('Please fill in both the address and email fields.');
+    showNotification('Please fill in both the address and email fields.', 'error');
     return;
   }
   
   if (!terms) {
-    alert('Please agree to the Terms of Use.');
+    showNotification('Please agree to the Terms of Use.', 'error');
     return;
   }
-  
-  // This is where you will eventually call your server-side API
-  // For now, we just show an alert.
-  alert(`Form is ready to be sent!\n\nAddress: ${address}\nEmail: ${email}\n\nOn the real site, this would trigger a request to the server.`);
-  
-  // Optional: Show a loading state on the button
-  const button = planForm.querySelector('button');
-  button.textContent = 'Sending...';
-  
-  // Revert button text after 2 seconds for this demo
-  setTimeout(() => {
+
+  // --- REAL API CALL ---
+  button.textContent = 'Generating...';
+  button.disabled = true;
+  notification.style.display = 'none';
+
+  try {
+    const response = await fetch('/api/generate-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address, email })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      // If server returns an error, show it
+      throw new Error(result.message || 'An unknown error occurred.');
+    }
+
+    showNotification(result.message, 'success');
+    planForm.reset(); // Clear the form on success
+
+  } catch (error) {
+    // Show network or server errors to the user
+    showNotification(`Error: ${error.message}`, 'error');
+    console.error('Fetch error:', error);
+  } finally {
+    // Always re-enable the button
     button.textContent = 'Get PDF Report';
-  }, 2000);
+    button.disabled = false;
+  }
 });
+
+// We need to add a new class to our style.css for the notification
+// to have success/error colors. Make sure this is in your style.css
+/*
+.notification { display: none; padding: 12px; margin-top: 15px; border-radius: 5px; text-align: center; font-weight: bold; }
+.notification.success { background-color: #d4edda; color: #155724; }
+.notification.error { background-color: #f8d7da; color: #721c24; }
+*/
