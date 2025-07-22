@@ -1,24 +1,101 @@
-// --- Имитация работы ИИ для генерации структурированного плана ---\nfunction generateEvacuationPlan(address) {\n  console.log(`AI is generating a detailed plan for: ${address}`);\n  \n  // В реальном проекте здесь был бы сложный анализ и вызов внешних API\n  // Мы же создадим более подробные, но имитированные данные.\n  \n  const risks = [\n    { type: "Наводнение", level: "Низкий", advice: "Проверьте зоны затопления." },\n    { type: "Пожар", level: "Средний", advice: "Имейте огнетушитель, регулярно проверяйте проводку." },\n    { type: "Землетрясение", level: "Очень низкий", advice: "Знайте безопасные места в доме." }\n  ];\n\n  const emergencyContacts = [\n    { name: "Экстренные службы", number: "911" },\n    { name: "Пожарная служба", number: "Ваш местный номер" },\n    { name: "Ближайшая больница", number: "Ваш местный номер" }\n  ];\n\n  const essentialItems = [\n    "Документы (паспорта, свидетельства)",\n    "Наличные деньги",\n    "Запас воды и еды на 72 часа",\n    "Аптечка первой помощи",\n    "Фонарик и батарейки",\n    "Портативное зарядное устройство",\n    "Теплая одежда, одеяла"\n  ];\n\n  const evacuationSteps = [\n    "Сохраняйте спокойствие и следуйте плану.",\n    "Возьмите заранее подготовленный 'тревожный чемоданчик'.",\n    "Отключите газ, воду и электричество, если это безопасно.",\n    "Эвакуируйтесь через ближайший безопасный выход (например, южная сторона вашего дома).",\n    "Двигайтесь к ближайшему укрытию или месту сбора (например, к ближайшему парку).",\n    "Информируйте близких о своем местоположении.",\n    "Следуйте указаниям местных властей и служб экстренной помощи."\n  ];\n\n  return {\n    address: address,\n    reportDate: new Date().toLocaleDateString(\'ru-RU\', { year: \'numeric\', month: \'long\', day: \'numeric\' }),\n    risks: risks,\n    emergencyContacts: emergencyContacts,\n    essentialItems: essentialItems,\n    evacuationSteps: evacuationSteps,\n    disclaimer: "Этот план является базовым шаблоном и создан на основе общих рекомендаций. Всегда следуйте указаниям местных властей и экстренных служб. Вся информация предоставляется 'как есть', без каких-либо гарантий. Пользователь несет полную ответственность за использование этого плана."\n  };\n}\n```
+import { OpenAI } from 'openai';
+import fetch from 'node-fetch';
+import nodemailer from 'nodemailer';
 
-**Важное изменение:** Теперь `generateEvacuationPlan` возвращает **JavaScript-объект** (по сути, JSON), а не HTML-строку. В этом объекте содержатся структурированные данные.
+// Initialize OpenAI client
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
 
-#### **Что дальше с PDFMonkey?**
+// The main serverless function
+export default async function handler(request, response) {
+    // Only accept POST requests
+    if (request.method !== 'POST') {
+        return response.status(405).json({ message: 'Method Not Allowed' });
+    }
 
-Теперь, когда наш бэкенд генерирует структурированные данные, тебе нужно будет:
+    const { address, email } = request.body;
+    if (!address || !email) {
+        return response.status(400).json({ message: 'Address and email are required' });
+    }
 
-1.  **Создать или обновить шаблон в PDFMonkey:** В шаблоне PDFMonkey ты будешь использовать переменные, например `{{address}}`, `{{risks.0.type}}`, `{{essentialItems.1}}` и так далее, чтобы вставить эти данные в нужные места и оформить их так, как ты хочешь (таблицы для рисков, списки для вещей).
-2.  **Обновить вызов API PDFMonkey:** В файле `api/generate-plan.js`, где мы сейчас отправляем `evacuationPlanHtml` в `sendMail`, тебе нужно будет отправить этот **структурированный объект** в PDFMonkey. Тебе понадобится настроить HTTP-запрос к API PDFMonkey, передав ему объект `evacuationPlanData` и `templateId`. Затем ты получишь ссылку на сгенерированный PDF, скачаешь его и прикрепишь к письму.
+    try {
+        // --- 1. Get structured data from AI ---
+        console.log(`[1/4] Generating AI data for: ${address}`);
+        const prompt = `Act as a U.S. emergency preparedness analyst. For the address "${address}", generate a concise evacuation plan. Your response must be ONLY a valid JSON object. Do not include any text or markdown before or after the JSON. The JSON must contain these exact keys: "risk_level_text", "risk_level_color", "critical_threats_count", "shelter_distance", "risks", "action_steps", "kit_items", "primary_route", "meeting_point". The "risks" key should be an array of objects, where each object has "type", "level_text", "level_color", and "advice". Use "high", "medium", or "low" for level_color. Generate realistic but mock data.`;
+        
+        const aiCompletion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            response_format: { type: "json_object" },
+            messages: [{ role: "user", content: prompt }],
+        });
+        const reportData = JSON.parse(aiCompletion.choices[0].message.content);
 
----
+        // Add report-specific data
+        reportData.address = address;
+        reportData.report_date = new Date().toLocaleDateString('en-US');
+        reportData.report_id = `SRWX-${Date.now()}`;
 
-### **2. Добавление правил и условий использования (Terms & Conditions)**
 
-Это очень важный шаг для любого публичного сервиса. Мы добавим:
+        // --- 2. Generate PDF using PDFMonkey ---
+        console.log('[2/4] Sending data to PDFMonkey...');
+        const pdfResponse = await fetch('https://api.pdfmonkey.com/v1/documents', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.PDFMONKEY_API_KEY}`,
+            },
+            body: JSON.stringify({
+                document: {
+                    template_id: process.env.PDFMONKEY_TEMPLATE_ID,
+                    payload: reportData,
+                    status: 'draft',
+                }
+            }),
+        });
 
-1.  **На фронтенде (`index.html`):** Чекбокс "Я согласен с условиями" и ссылку на текст условий.
-2.  **На фронтенде (`script.js`):** Логику, которая не позволит отправить форму, пока чекбокс не будет отмечен.
-3.  **На бэкенде (`api/generate-plan.js`):** Проверку, что этот флаг был установлен.
+        if (!pdfResponse.ok) {
+            const errorText = await pdfResponse.text();
+            throw new Error(`PDFMonkey API Error: ${errorText}`);
+        }
+        const pdfData = await pdfResponse.json();
+        const downloadUrl = pdfData.document.download_url;
 
-Пожалуйста, сначала обнови свой файл `api/generate-plan.js` с новой функцией `generateEvacuationPlan`. Как только ты это сделаешь, дай мне знать, и мы перейдем к изменениям на фронтенде (`index.html` и `script.js`) и обсудим интеграцию с PDFMonkey подробнее.
 
-Как продвигаются дела с `style.css`, которые я присылал ранее? Успешно обновил его?
+        // --- 3. Download the generated PDF file ---
+        console.log('[3/4] Downloading generated PDF...');
+        const pdfFileResponse = await fetch(downloadUrl);
+        const pdfBuffer = await pdfFileResponse.arrayBuffer();
+
+
+        // --- 4. Send the email with PDF attachment ---
+        console.log(`[4/4] Sending email to: ${email}...`);
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_SERVER_USER,
+                pass: process.env.EMAIL_SERVER_PASSWORD,
+            },
+        });
+
+        await transporter.sendMail({
+            from: `"Surwix Reports" <${process.env.EMAIL_SERVER_USER}>`,
+            to: email,
+            subject: `Your Personal Evacuation Plan from Surwix for ${address}`,
+            text: "Thank you for using Surwix. Your AI-generated evacuation plan is attached to this email.",
+            attachments: [{
+                filename: 'Surwix-Evacuation-Plan.pdf',
+                content: Buffer.from(pdfBuffer),
+                contentType: 'application/pdf',
+            }],
+        });
+
+        // --- SUCCESS ---
+        console.log('Process complete. Sending success response.');
+        return response.status(200).json({ message: 'Success! Your report has been generated and sent to your email.' });
+
+    } catch (error) {
+        console.error('An error occurred in the process:', error);
+        return response.status(500).json({ message: 'A server error occurred. Please try again later.' });
+    }
+}
