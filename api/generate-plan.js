@@ -1,100 +1,24 @@
-import nodemailer from 'nodemailer';
-import { OpenAI } from 'openai';
-import fetch from 'node-fetch';
+// --- Имитация работы ИИ для генерации структурированного плана ---\nfunction generateEvacuationPlan(address) {\n  console.log(`AI is generating a detailed plan for: ${address}`);\n  \n  // В реальном проекте здесь был бы сложный анализ и вызов внешних API\n  // Мы же создадим более подробные, но имитированные данные.\n  \n  const risks = [\n    { type: "Наводнение", level: "Низкий", advice: "Проверьте зоны затопления." },\n    { type: "Пожар", level: "Средний", advice: "Имейте огнетушитель, регулярно проверяйте проводку." },\n    { type: "Землетрясение", level: "Очень низкий", advice: "Знайте безопасные места в доме." }\n  ];\n\n  const emergencyContacts = [\n    { name: "Экстренные службы", number: "911" },\n    { name: "Пожарная служба", number: "Ваш местный номер" },\n    { name: "Ближайшая больница", number: "Ваш местный номер" }\n  ];\n\n  const essentialItems = [\n    "Документы (паспорта, свидетельства)",\n    "Наличные деньги",\n    "Запас воды и еды на 72 часа",\n    "Аптечка первой помощи",\n    "Фонарик и батарейки",\n    "Портативное зарядное устройство",\n    "Теплая одежда, одеяла"\n  ];\n\n  const evacuationSteps = [\n    "Сохраняйте спокойствие и следуйте плану.",\n    "Возьмите заранее подготовленный 'тревожный чемоданчик'.",\n    "Отключите газ, воду и электричество, если это безопасно.",\n    "Эвакуируйтесь через ближайший безопасный выход (например, южная сторона вашего дома).",\n    "Двигайтесь к ближайшему укрытию или месту сбора (например, к ближайшему парку).",\n    "Информируйте близких о своем местоположении.",\n    "Следуйте указаниям местных властей и служб экстренной помощи."\n  ];\n\n  return {\n    address: address,\n    reportDate: new Date().toLocaleDateString(\'ru-RU\', { year: \'numeric\', month: \'long\', day: \'numeric\' }),\n    risks: risks,\n    emergencyContacts: emergencyContacts,\n    essentialItems: essentialItems,\n    evacuationSteps: evacuationSteps,\n    disclaimer: "Этот план является базовым шаблоном и создан на основе общих рекомендаций. Всегда следуйте указаниям местных властей и экстренных служб. Вся информация предоставляется 'как есть', без каких-либо гарантий. Пользователь несет полную ответственность за использование этого плана."\n  };\n}\n```
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+**Важное изменение:** Теперь `generateEvacuationPlan` возвращает **JavaScript-объект** (по сути, JSON), а не HTML-строку. В этом объекте содержатся структурированные данные.
 
-// Функция, которая просит у ИИ сгенерировать JSON с данными для отчета
-async function getAiReportData(address) {
-    console.log(`Requesting report data from AI for: ${address}`);
+#### **Что дальше с PDFMonkey?**
 
-    // Полный и правильный промпт, который включает слово JSON
-    const prompt = `
-        Act as a data analyst. For the U.S. address "${address}", generate a mock business intelligence report for an evacuation plan company.
-        Your response must be ONLY a valid JSON object. Do not include any text before or after the JSON.
-        The JSON must match this exact structure:
-        {
-          "followers": { "count": INTEGER, "difference": INTEGER, "progress": INTEGER_BETWEEN_0_AND_100 },
-          "customers": { "count": INTEGER, "difference": INTEGER, "progress": INTEGER_BETWEEN_0_AND_100 },
-          "sales": { "count": INTEGER, "difference": INTEGER, "progress": INTEGER_BETWEEN_0_AND_100 },
-          "semester_revenues": [
-            { "month": "Jan", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
-            { "month": "Feb", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
-            { "month": "Mar", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
-            { "month": "Apr", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
-            { "month": "May", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER },
-            { "month": "Jun", "y2018": INTEGER, "y2019": INTEGER, "y2020": INTEGER }
-          ],
-          "expenses": { "support": INTEGER, "sales": INTEGER, "drives": INTEGER, "marketing": INTEGER, "allocated": INTEGER, "actual": INTEGER },
-          "evacuation_plan_summary": "Provide a 2-3 sentence summary of the key evacuation advice for the area based on the address."
-        }
-        Generate realistic but random integer values for all fields.
-    `;
+Теперь, когда наш бэкенд генерирует структурированные данные, тебе нужно будет:
 
-    try {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            response_format: { type: "json_object" },
-            messages: [{ role: "user", content: prompt }],
-        });
-        return JSON.parse(completion.choices[0].message.content);
-    } catch (error) {
-        console.error("Error from OpenAI:", error);
-        throw new Error("Failed to get data from AI");
-    }
-}
+1.  **Создать или обновить шаблон в PDFMonkey:** В шаблоне PDFMonkey ты будешь использовать переменные, например `{{address}}`, `{{risks.0.type}}`, `{{essentialItems.1}}` и так далее, чтобы вставить эти данные в нужные места и оформить их так, как ты хочешь (таблицы для рисков, списки для вещей).
+2.  **Обновить вызов API PDFMonkey:** В файле `api/generate-plan.js`, где мы сейчас отправляем `evacuationPlanHtml` в `sendMail`, тебе нужно будет отправить этот **структурированный объект** в PDFMonkey. Тебе понадобится настроить HTTP-запрос к API PDFMonkey, передав ему объект `evacuationPlanData` и `templateId`. Затем ты получишь ссылку на сгенерированный PDF, скачаешь его и прикрепишь к письму.
 
-// Основной обработчик
-export default async function handler(request, response) {
-    const { address, email } = request.body;
-    if (!address || !email) return response.status(400).json({ message: 'Address and email are required' });
+---
 
-    try {
-        const aiData = await getAiReportData(address);
+### **2. Добавление правил и условий использования (Terms & Conditions)**
 
-        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        const pdfResponse = await fetch(`https://api.pdfmonkey.io/v1/documents`, { // .io вместо .com
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.PDFMONKEY_API_KEY}`,
-            },
-            body: JSON.stringify({
-                document: {
-                    template_id: process.env.PDFMONKEY_TEMPLATE_ID,
-                    payload: aiData,
-                    status: 'draft',
-                }
-            }),
-        });
+Это очень важный шаг для любого публичного сервиса. Мы добавим:
 
-        if (!pdfResponse.ok) {
-            throw new Error(`PDFMonkey API error: ${await pdfResponse.text()}`);
-        }
+1.  **На фронтенде (`index.html`):** Чекбокс "Я согласен с условиями" и ссылку на текст условий.
+2.  **На фронтенде (`script.js`):** Логику, которая не позволит отправить форму, пока чекбокс не будет отмечен.
+3.  **На бэкенде (`api/generate-plan.js`):** Проверку, что этот флаг был установлен.
 
-        const pdfData = await pdfResponse.json();
-        const downloadUrl = pdfData.document.download_url;
+Пожалуйста, сначала обнови свой файл `api/generate-plan.js` с новой функцией `generateEvacuationPlan`. Как только ты это сделаешь, дай мне знать, и мы перейдем к изменениям на фронтенде (`index.html` и `script.js`) и обсудим интеграцию с PDFMonkey подробнее.
 
-        const pdfDownloadResponse = await fetch(downloadUrl);
-        const pdfBuffer = await pdfDownloadResponse.arrayBuffer();
-
-        const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.EMAIL_SERVER_USER, pass: process.env.PDFMONKEY_API_KEY } });
-        await transporter.sendMail({
-            from: `"Evacuation Plan Bot" <${process.env.EMAIL_SERVER_USER}>`,
-            to: email,
-            subject: `Ваш BI отчет по эвакуации для ${address}`,
-            text: "Ваш PDF-отчет прикреплен к этому письму.",
-            attachments: [{
-                filename: 'BI-Evacuation-Report.pdf',
-                content: Buffer.from(pdfBuffer),
-                contentType: 'application/pdf',
-            }],
-        });
-
-        response.status(200).json({ message: `BI-отчет успешно сгенерирован и отправлен!` });
-
-    } catch (error) {
-        console.error(error);
-        response.status(500).json({ message: 'Что-то пошло не так при создании отчета.' });
-    }
-}
+Как продвигаются дела с `style.css`, которые я присылал ранее? Успешно обновил его?
