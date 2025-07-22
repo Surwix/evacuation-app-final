@@ -1,7 +1,11 @@
 {
-  "type": "module",
-  "dependencies": {
-    "nodemailer": "6.9.14",
-    "openai": "4.28.0"
+  "template_id": "YOUR_PDFMONKEY_TEMPLATE_ID",
+  "data": {
+    "address": "1218 Caraway Ln, Haslet, TX 76052",
+    "risks": {
+      "flood": 0.7,
+      "fire": 0.3
+    },
+    "actions": ["Prepare water", "Gather documents"]
   }
 }
