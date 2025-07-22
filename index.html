@@ -1,27 +1,33 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Personal Evacuation Plan</title>
+    <title>Ваш персональный план эвакуации</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://maps.googleapis.com/maps/api/js?key=ТВОЙ_API_КЛЮЧ&libraries=places&callback=initAutocomplete" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=ВАШ_КЛЮЧ_Maps_API&libraries=places&callback=initAutocomplete" async defer></script>
 </head>
 <body>
     <div class="container">
-        <h1>Your Personal Evacuation Plan</h1>
-        <p>Enter your U.S. address and email to instantly receive a customized report.</p>
+        <h1>Ваш персональный план эвакуации</h1>
+        <p>Введите ваш адрес в США и email, чтобы мгновенно получить отчет, сгенерированный ИИ.</p>
         
         <form id="plan-form">
             <div class="form-group">
-                <label for="address-input">Your Address</label>
-                <input type="text" id="address-input" placeholder="Start typing your full U.S. address..." required>
+                <label for="address-input">Ваш адрес</label>
+                <input type="text" id="address-input" placeholder="Начните вводить ваш адрес в США..." required>
             </div>
             <div class="form-group">
-                <label for="email-input">Your Email</label>
-                <input type="email" id="email-input" placeholder="Enter your email to receive the report" required>
+                <label for="email-input">Ваш Email</label>
+                <input type="email" id="email-input" placeholder="Введите email для получения отчета" required>
             </div>
-            <button type="submit">Get My Plan</button>
+            
+            <div class="form-group-terms">
+                <input type="checkbox" id="terms-checkbox" required>
+                <label for="terms-checkbox">Я прочитал(а) и согласен(на) с <a href="terms.html" target="_blank">условиями использования</a></label>
+            </div>
+            
+            <button type="submit">Получить мой план</button>
             
             <div id="notification" class="notification"></div>
         </form>
